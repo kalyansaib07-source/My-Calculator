@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scientific Calculator</title>
+    <style>
+        /* ---------- Design tokens ---------- */
+        :root {
+            --body-bg: #16161a;
+            --case-top: #2e2e34;
+            --case-bottom: #1c1c20;
+            --case-edge: #0e0e11;
+            --screen-bg: #0c1712;
+            --digit: #8ff0c0;
+            --digit-dim: #4a7a63;
+            --key-num: #3a3a41;
+            --key-num-hi: #46464e;
+            --key-func: #55555f;
+            --key-func-hi: #63636e;
+            --key-sci: #40414c;
+            --key-sci-hi: #4c4d59;
+            --key-sci-active: #7d8cff;
+            --key-op: #d97a2e;
+            --key-op-hi: #ea8b3a;
+            --key-eq: #2fb387;
+            --key-eq-hi: #38cf9c;
+            --text-light: #f1efe9;
+            --text-dark: #201f1c;
+            --radius: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% -10%, #232329 0%, var(--body-bg) 55%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+        }
+
+        /* ---------- Calculator case ---------- */
+        .calculator {
+            width: 100%;
+            max-width: 440px;
+            background: linear-gradient(160deg, var(--case-top), var(--case-bottom));
+            border-radius: calc(var(--radius) + 10px);
+            padding: 18px;
+            box-shadow:
+                0 30px 60px -15px rgba(0, 0, 0, 0.65),
+                0 10px 25px -10px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--case-edge);
+            overflow: hidden;
+        }
+
+        .brand {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 2px 8px 12px;
+            color: #74747c;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .brand span:last-child {
+            color: #4a7a63;
+            letter-spacing: 0.08em;
+        }
+
+        /* ---------- Screen ---------- */
+        .screen {
+            background: linear-gradient(180deg, #0e1a15, var(--screen-bg));
+            border-radius: var(--radius);
+            padding: 14px 18px 16px;
+            margin-bottom: 16px;
+            text-align: right;
+            overflow: hidden;
+            box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .screen::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 1px, transparent 1px, transparent 3px);
+            pointer-events: none;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            color: var(--digit-dim);
+            min-height: 14px;
+            margin-bottom: 6px;
+        }
+
+        .status-row .indicators {
+            display: flex;
+            gap: 10px;
+        }
+
+        .status-row .indicators span {
+            opacity: 0.35;
+            transition: opacity 0.15s ease, color 0.15s ease;
+        }
+
+        .status-row .indicators span.on {
+            opacity: 1;
+            color: var(--digit);
+        }
+
+        .expression {
+            min-height: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 15px;
+            color: var(--digit-dim);
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .expression::-webkit-scrollbar {
+            display: none;
+        }
+
+        .result {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: clamp(28px, 8vw, 40px);
+            font-weight: 700;
+            color: var(--digit);
+            text-shadow: 0 0 12px rgba(143, 240, 192, 0.35);
+            white-space: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            margin-top: 4px;
+            letter-spacing: 0.01em;
+        }
+
+        .result::-webkit-scrollbar {
+            display: none;
+        }
+
+        .result.error {
+            color: #ff7a6e;
+            text-shadow: 0 0 12px rgba(255, 122, 110, 0.35);
+            font-size: clamp(20px, 6vw, 26px);
+        }
+
+        /* ---------- Keypad ---------- */
+        .sci-panel,
+        .keypad {
+            display: grid;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .sci-panel {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-auto-rows: 44px;
+            margin-bottom: 10px;
+        }
+
+        .keypad {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-auto-rows: 60px;
+        }
+
+        button {
+            border: none;
+            outline: none;
+            font-family: inherit;
+            font-weight: 600;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
+            border-radius: 12px;
+            cursor: pointer;
+            color: var(--text-light);
+            background: var(--key-num);
+            box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            transition: transform 0.06s ease, box-shadow 0.06s ease, background 0.15s ease, color 0.15s ease;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .keypad button {
+            font-size: 19px;
+            border-radius: 14px;
+        }
+
+        .sci-panel button {
+            font-size: 13px;
+            background: var(--key-sci);
+        }
+
+        .sci-panel button:hover {
+            background: var(--key-sci-hi);
+        }
+
+        button:hover {
+            background: var(--key-num-hi);
+        }
+
+        button:active,
+        button.pressed {
+            transform: translateY(3px);
+            box-shadow: 0 0px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .key-func {
+            background: var(--key-func);
+            color: var(--text-light);
+        }
+
+        .key-func:hover {
+            background: var(--key-func-hi);
+        }
+
+        .key-op {
+            background: var(--key-op);
+            color: var(--text-dark);
+            font-size: 22px;
+        }
+
+        .key-op:hover {
+            background: var(--key-op-hi);
+        }
+
+        .key-eq {
+            background: var(--key-eq);
+            color: var(--text-dark);
+            font-size: 22px;
+        }
+
+        .key-eq:hover {
+            background: var(--key-eq-hi);
+        }
+
+        .key-zero {
+            grid-column: span 2;
+        }
+
+        .key-toggle.active {
+            background: var(--key-sci-active);
+            color: var(--text-dark);
+            box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 10px rgba(125, 140, 255, 0.5);
+        }
+
+        @media (max-width: 380px) {
+            .keypad {
+                grid-auto-rows: 52px;
+            }
+
+            .sci-panel {
+                grid-auto-rows: 40px;
+            }
+
+            .keypad button {
+                font-size: 16px;
+            }
+
+            .sci-panel button {
+                font-size: 11px;
+            }
+
+            .key-op {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="calculator" role="group" aria-label="Scientific Calculator">
+        <div class="brand"><span>Graphite&nbsp;Calc</span><span>scientific</span></div>
+
+        <div class="screen">
+            <div class="status-row">
+                <div class="indicators">
+                    <span id="ind-2nd">2ND</span>
+                    <span id="ind-mem">M</span>
+                </div>
+                <div id="ind-angle">DEG</div>
+            </div>
+            <div class="expression" id="expression">&nbsp;</div>
+            <div class="result" id="result">0</div>
+        </div>
+
+        <!-- Scientific function panel -->
+        <div class="sci-panel">
+            <button class="key-toggle" id="btn-2nd" data-action="toggle-2nd">2nd</button>
+            <button class="key-func" id="btn-angle" data-action="toggle-angle">DEG</button>
+            <button class="key-func" data-action="memory-clear">MC</button>
+            <button class="key-func" data-action="memory-recall">MR</button>
+            <button class="key-func" data-action="memory-add">M+</button>
+
+            <button class="key-func" data-action="memory-sub">M−</button>
+            <button class="key-sci key-toggleable" id="btn-sq" data-primary-label="x²" data-primary-token="²"
+                data-primary-postfix="true" data-secondary-label="x³" data-secondary-token="³"
+                data-secondary-postfix="true" data-action="sci-postfix">x²</button>
+            <button class="key-sci" data-action="operator" data-value="^">x^y</button>
+            <button class="key-sci" data-action="postfix" data-value="√(" data-func="true">√</button>
+            <button class="key-sci" data-action="postfix" data-value="⁻¹">1/x</button>
+
+            <button class="key-sci key-toggleable" id="btn-sin" data-primary-label="sin" data-primary-token="sin("
+                data-primary-postfix="false" data-secondary-label="sin⁻¹" data-secondary-token="asin("
+                data-secondary-postfix="false" data-action="sci-func">sin</button>
+            <button class="key-sci key-toggleable" id="btn-cos" data-primary-label="cos" data-primary-token="cos("
+                data-primary-postfix="false" data-secondary-label="cos⁻¹" data-secondary-token="acos("
+                data-secondary-postfix="false" data-action="sci-func">cos</button>
+            <button class="key-sci key-toggleable" id="btn-tan" data-primary-label="tan" data-primary-token="tan("
+                data-primary-postfix="false" data-secondary-label="tan⁻¹" data-secondary-token="atan("
+                data-secondary-postfix="false" data-action="sci-func">tan</button>
+            <button class="key-sci key-toggleable" id="btn-ln" data-primary-label="ln" data-primary-token="ln("
+                data-primary-postfix="false" data-secondary-label="eˣ" data-secondary-token="e^("
+                data-secondary-postfix="false" data-action="sci-func">ln</button>
+            <button class="key-sci key-toggleable" id="btn-log" data-primary-label="log" data-primary-token="log("
+                data-primary-postfix="false" data-secondary-label="10ˣ" data-secondary-token="10^("
+                data-secondary-postfix="false" data-action="sci-func">log</button>
+
+            <button class="key-sci" data-action="postfix" data-value="!">x!</button>
+            <button class="key-sci" data-action="constant" data-value="π">π</button>
+            <button class="key-sci" data-action="constant" data-value="e">e</button>
+            <button class="key-sci" data-action="percent">%</button>
+            <button class="key-func" data-action="backspace">⌫</button>
+        </div>
+
+        <!-- Standard keypad -->
+        <div class="keypad">
+            <button class="key-func" data-action="clear">AC</button>
+            <button class="key-func" data-action="paren-open">(</button>
+            <button class="key-func" data-action="paren-close">)</button>
+            <button class="key-op" data-action="operator" data-value="÷">÷</button>
+
+            <button class="key-num" data-action="digit" data-value="7">7</button>
+            <button class="key-num" data-action="digit" data-value="8">8</button>
+            <button class="key-num" data-action="digit" data-value="9">9</button>
+            <button class="key-op" data-action="operator" data-value="×">×</button>
+
+            <button class="key-num" data-action="digit" data-value="4">4</button>
+            <button class="key-num" data-action="digit" data-value="5">5</button>
+            <button class="key-num" data-action="digit" data-value="6">6</button>
+            <button class="key-op" data-action="operator" data-value="−">−</button>
+
+            <button class="key-num" data-action="digit" data-value="1">1</button>
+            <button class="key-num" data-action="digit" data-value="2">2</button>
+            <button class="key-num" data-action="digit" data-value="3">3</button>
+            <button class="key-op" data-action="operator" data-value="+">+</button>
+
+            <button class="key-num key-zero" data-action="digit" data-value="0">0</button>
+            <button class="key-num" data-action="decimal">.</button>
+            <button class="key-eq" data-action="equals">=</button>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            "use strict";
+
+            // ---------- State ----------
+            var expressionEl = document.getElementById('expression');
+            var resultEl = document.getElementById('result');
+            var ind2nd = document.getElementById('ind-2nd');
+            var indMem = document.getElementById('ind-mem');
+            var indAngle = document.getElementById('ind-angle');
+            var btnAngle = document.getElementById('btn-angle');
+            var btn2nd = document.getElementById('btn-2nd');
+
+            var expression = "";
+            var justEvaluated = false;
+            var isSecond = false;
+            var angleMode = "deg";     // "deg" | "rad"
+            var memoryValue = 0;
+
+            var OPERATORS = ["+", "−", "×", "÷", "^"];
+            var VALUE_END = /[\d)%!²³¹]/; // chars after which a value is considered "complete"
+            var FUNC_NAMES = ["asin", "acos", "atan", "sin", "cos", "tan", "ln", "log"];
+
+            // ---------- Toggleable scientific buttons (2nd function) ----------
+            var toggleButtons = document.querySelectorAll('.key-toggleable');
+
+            function refreshToggleLabels() {
+                toggleButtons.forEach(function (btn) {
+                    var label = isSecond ? btn.dataset.secondaryLabel : btn.dataset.primaryLabel;
+                    var token = isSecond ? btn.dataset.secondaryToken : btn.dataset.primaryToken;
+                    var postfix = isSecond ? btn.dataset.secondaryPostfix : btn.dataset.primaryPostfix;
+                    btn.textContent = label;
+                    btn.dataset.activeToken = token;
+                    btn.dataset.activePostfix = postfix;
+                });
+                btn2nd.classList.toggle('active', isSecond);
+                ind2nd.classList.toggle('on', isSecond);
+            }
+
+            // ---------- Display ----------
+            function updateDisplay() {
+                expressionEl.textContent = expression.length ? expression : "\u00A0";
+                if (!justEvaluated) {
+                    var preview = tryEvaluate(expression);
+                    resultEl.classList.remove('error');
+                    resultEl.textContent = (preview !== null) ? formatNumber(preview) : (expression.length ? expression : "0");
+                }
+                indMem.classList.toggle('on', memoryValue !== 0);
+            }
+
+            function showError() {
+                resultEl.textContent = "Error";
+                resultEl.classList.add('error');
+            }
+
+            // ---------- Number formatting ----------
+            function formatNumber(num) {
+                if (num === Infinity || num === -Infinity || isNaN(num)) return "Error";
+                if (Object.is(num, -0)) num = 0;
+                var rounded = parseFloat(num.toPrecision(12));
+
+                if (Math.abs(rounded) >= 1e15 || (Math.abs(rounded) < 1e-9 && rounded !== 0)) {
+                    return rounded.toExponential(6).replace(/\.?0+e/, "e");
+                }
+                var str = rounded.toString();
+                if (str.indexOf("e") === -1) {
+                    var parts = str.split(".");
+                    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                    str = parts.join(".");
+                }
+                return str;
+            }
+
+            function rawNumberString(num) {
+                var rounded = parseFloat(num.toPrecision(12));
+                return rounded.toString();
+            }
+
+            // ---------- Safe expression parser (recursive descent) ----------
+            // expr    := term (('+'|'−') term)*
+            // term    := unary (('×'|'÷') unary)*
+            // unary   := ('+'|'−')* power
+            // power   := postfix ('^' unary)?
+            // postfix := primary ('!' | '%' | '²' | '³' | '⁻¹')*
+            // primary := number | 'π' | 'e' | func '(' expr ')' | '(' expr ')'
+            function evaluateExpression(rawExpr) {
+                var str = rawExpr.replace(/\s+/g, "");
+                if (str.length === 0) throw new Error("empty");
+
+                var openCount = (str.match(/\(/g) || []).length;
+                var closeCount = (str.match(/\)/g) || []).length;
+                for (var i = 0; i < openCount - closeCount; i++) str += ")";
+
+                var pos = 0;
+                function peek() { return str[pos]; }
+                function isDigit(c) { return c !== undefined && c >= '0' && c <= '9'; }
+
+                function toRad(v) { return angleMode === "deg" ? v * Math.PI / 180 : v; }
+                function fromRad(v) { return angleMode === "deg" ? v * 180 / Math.PI : v; }
+
+                function factorial(n) {
+                    if (Math.abs(n - Math.round(n)) < 1e-9) n = Math.round(n);
+                    if (n < 0 || !Number.isInteger(n)) throw new Error("bad factorial");
+                    if (n > 170) throw new Error("overflow");
+                    var result = 1;
+                    for (var k = 2; k <= n; k++) result *= k;
+                    return result;
+                }
+
+                function parseNumber() {
+                    var start = pos;
+                    while (isDigit(peek())) pos++;
+                    if (peek() === '.') {
+                        pos++;
+                        if (!isDigit(peek())) throw new Error("bad number");
+                        while (isDigit(peek())) pos++;
+                    }
+                    if (start === pos) throw new Error("expected number");
+                    return parseFloat(str.slice(start, pos));
+                }
+
+                function matchFunc() {
+                    for (var f = 0; f < FUNC_NAMES.length; f++) {
+                        var name = FUNC_NAMES[f];
+                        if (str.startsWith(name, pos)) return name;
+                    }
+                    return null;
+                }
+
+                function applyFunc(name, arg) {
+                    switch (name) {
+                        case "sin": return Math.sin(toRad(arg));
+                        case "cos": return Math.cos(toRad(arg));
+                        case "tan": return Math.tan(toRad(arg));
+                        case "asin":
+                            if (arg < -1 || arg > 1) throw new Error("domain");
+                            return fromRad(Math.asin(arg));
+                        case "acos":
+                            if (arg < -1 || arg > 1) throw new Error("domain");
+                            return fromRad(Math.acos(arg));
+                        case "atan": return fromRad(Math.atan(arg));
+                        case "ln":
+                            if (arg <= 0) throw new Error("domain");
+                            return Math.log(arg);
+                        case "log":
+                            if (arg <= 0) throw new Error("domain");
+                            return Math.log10(arg);
+                        default: throw new Error("unknown function");
+                    }
+                }
+
+                function parsePrimary() {
+                    var c = peek();
+                    if (c === '(') {
+                        pos++;
+                        var val = parseExpr();
+                        if (peek() !== ')') throw new Error("mismatched parentheses");
+                        pos++;
+                        return val;
+                    }
+                    if (c === '√') {
+                        pos++;
+                        if (peek() !== '(') throw new Error("expected (");
+                        pos++;
+                        var v = parseExpr();
+                        if (peek() !== ')') throw new Error("mismatched parentheses");
+                        pos++;
+                        if (v < 0) throw new Error("domain");
+                        return Math.sqrt(v);
+                    }
+                    if (c === '∛') {
+                        pos++;
+                        if (peek() !== '(') throw new Error("expected (");
+                        pos++;
+                        var v2 = parseExpr();
+                        if (peek() !== ')') throw new Error("mismatched parentheses");
+                        pos++;
+                        return Math.cbrt(v2);
+                    }
+                    if (c === 'π') { pos++; return Math.PI; }
+                    if (c === 'e' && !str.startsWith("exp", pos)) { pos++; return Math.E; }
+
+                    var fn = matchFunc();
+                    if (fn) {
+                        pos += fn.length;
+                        if (peek() !== '(') throw new Error("expected (");
+                        pos++;
+                        var arg = parseExpr();
+                        if (peek() !== ')') throw new Error("mismatched parentheses");
+                        pos++;
+                        return applyFunc(fn, arg);
+                    }
+
+                    return parseNumber();
+                }
+
+                function parsePostfix() {
+                    var val = parsePrimary();
+                    while (true) {
+                        if (peek() === '!') { pos++; val = factorial(val); }
+                        else if (peek() === '%') { pos++; val = val / 100; }
+                        else if (peek() === '²') { pos++; val = val * val; }
+                        else if (peek() === '³') { pos++; val = val * val * val; }
+                        else if (str.substr(pos, 2) === '⁻¹') {
+                            pos += 2;
+                            if (val === 0) throw new Error("division by zero");
+                            val = 1 / val;
+                        }
+                        else break;
+                    }
+                    return val;
+                }
+
+                function parsePower() {
+                    var base = parsePostfix();
+                    if (peek() === '^') {
+                        pos++;
+                        var exp = parseUnary();
+                        base = Math.pow(base, exp);
+                    }
+                    return base;
+                }
+
+                function parseUnary() {
+                    var sign = 1;
+                    while (peek() === '+' || peek() === '−') {
+                        if (peek() === '−') sign *= -1;
+                        pos++;
+                    }
+                    return sign * parsePower();
+                }
+
+                function parseTerm() {
+                    var val = parseUnary();
+                    while (peek() === '×' || peek() === '÷') {
+                        var op = peek();
+                        pos++;
+                        var rhs = parseUnary();
+                        if (op === '×') val = val * rhs;
+                        else {
+                            if (rhs === 0) throw new Error("division by zero");
+                            val = val / rhs;
+                        }
+                    }
+                    return val;
+                }
+
+                function parseExpr() {
+                    var val = parseTerm();
+                    while (peek() === '+' || peek() === '−') {
+                        var op = peek();
+                        pos++;
+                        var rhs = parseTerm();
+                        val = (op === '+') ? val + rhs : val - rhs;
+                    }
+                    return val;
+                }
+
+                var result = parseExpr();
+                if (pos !== str.length) throw new Error("unexpected token");
+                if (!isFinite(result)) throw new Error("not finite");
+                return result;
+            }
+
+            function tryEvaluate(expr) {
+                try {
+                    var trimmed = expr.trim();
+                    if (!trimmed.length) return null;
+                    var last = trimmed.slice(-1);
+                    if (OPERATORS.indexOf(last) !== -1 || last === "(" || last === ".") return null;
+                    return evaluateExpression(expr);
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            // ---------- Input handling ----------
+            function lastChar() { return expression.length ? expression.slice(-1) : ""; }
+
+            function resetIfJustEvaluated(clearFully) {
+                if (justEvaluated) {
+                    expression = clearFully ? "" : expression;
+                    justEvaluated = false;
+                }
+            }
+
+            function appendDigit(d) {
+                resetIfJustEvaluated(true);
+                expression += d;
+                updateDisplay();
+            }
+
+            function appendDecimal() {
+                if (justEvaluated) { expression = "0"; justEvaluated = false; }
+                var segment = expression.split(/[+−×÷^(]/).pop();
+                if (segment.indexOf(".") !== -1) return;
+                if (segment === "" || OPERATORS.indexOf(lastChar()) !== -1 || lastChar() === "(") {
+                    expression += "0.";
+                } else {
+                    expression += ".";
+                }
+                updateDisplay();
+            }
+
+            function appendOperator(op) {
+                if (expression === "" && op !== "−") return;
+                justEvaluated = false;
+                var last = lastChar();
+                if (OPERATORS.indexOf(last) !== -1) {
+                    expression = expression.slice(0, -1) + op;
+                } else {
+                    expression += op;
+                }
+                updateDisplay();
+            }
+
+            function appendOpenParen() {
+                resetIfJustEvaluated(true);
+                var last = lastChar();
+                expression += VALUE_END.test(last) ? "×(" : "(";
+                updateDisplay();
+            }
+
+            function appendCloseParen() {
+                var openCount = (expression.match(/\(/g) || []).length;
+                var closeCount = (expression.match(/\)/g) || []).length;
+                if (openCount > closeCount && VALUE_END.test(lastChar())) {
+                    expression += ")";
+                    updateDisplay();
+                }
+            }
+
+            function appendPercent() {
+                if (VALUE_END.test(lastChar())) {
+                    expression += "%";
+                    updateDisplay();
+                }
+            }
+
+            function appendFunctionToken(token) {
+                resetIfJustEvaluated(true);
+                var last = lastChar();
+                expression += VALUE_END.test(last) ? ("×" + token) : token;
+                updateDisplay();
+            }
+
+            function appendConstant(symbol) {
+                resetIfJustEvaluated(true);
+                var last = lastChar();
+                expression += VALUE_END.test(last) ? ("×" + symbol) : symbol;
+                updateDisplay();
+            }
+
+            function appendPostfixSymbol(symbol) {
+                if (VALUE_END.test(lastChar())) {
+                    expression += symbol;
+                    updateDisplay();
+                }
+            }
+
+            function clearAll() {
+                expression = "";
+                justEvaluated = false;
+                resultEl.classList.remove('error');
+                updateDisplay();
+            }
+
+            function backspace() {
+                if (justEvaluated) { clearAll(); return; }
+                // step back over multi-char postfix tokens cleanly
+                if (expression.endsWith('⁻¹')) {
+                    expression = expression.slice(0, -2);
+                } else {
+                    expression = expression.slice(0, -1);
+                }
+                resultEl.classList.remove('error');
+                updateDisplay();
+            }
+
+            function equals() {
+                if (expression === "") return;
+                try {
+                    var value = evaluateExpression(expression);
+                    resultEl.classList.remove('error');
+                    resultEl.textContent = formatNumber(value);
+                    expression = rawNumberString(value);
+                    justEvaluated = true;
+                    expressionEl.textContent = expression;
+                } catch (e) {
+                    showError();
+                    justEvaluated = true;
+                }
+            }
+
+            // ---------- Memory ----------
+            function memoryAdd() {
+                var v = tryEvaluate(expression);
+                if (v !== null) { memoryValue += v; updateDisplay(); }
+            }
+            function memorySub() {
+                var v = tryEvaluate(expression);
+                if (v !== null) { memoryValue -= v; updateDisplay(); }
+            }
+            function memoryRecall() {
+                appendConstant(rawNumberString(memoryValue));
+            }
+            function memoryClear() {
+                memoryValue = 0;
+                updateDisplay();
+            }
+
+            // ---------- Button wiring ----------
+            document.querySelectorAll('button[data-action]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    handleAction(btn);
+                    flashPress(btn);
+                });
+            });
+
+            function flashPress(btn) {
+                btn.classList.add('pressed');
+                setTimeout(function () { btn.classList.remove('pressed'); }, 100);
+            }
+
+            function handleAction(btn) {
+                var action = btn.dataset.action;
+                switch (action) {
+                    case 'digit': appendDigit(btn.dataset.value); break;
+                    case 'decimal': appendDecimal(); break;
+                    case 'operator': appendOperator(btn.dataset.value); break;
+                    case 'paren-open': appendOpenParen(); break;
+                    case 'paren-close': appendCloseParen(); break;
+                    case 'percent': appendPercent(); break;
+                    case 'postfix':
+                        if (btn.dataset.func === "true") appendFunctionToken(btn.dataset.value);
+                        else appendPostfixSymbol(btn.dataset.value);
+                        break;
+                    case 'constant': appendConstant(btn.dataset.value); break;
+                    case 'clear': clearAll(); break;
+                    case 'backspace': backspace(); break;
+                    case 'equals': equals(); break;
+                    case 'sci-func':
+                        appendFunctionToken(btn.dataset.activeToken);
+                        break;
+                    case 'sci-postfix':
+                        appendPostfixSymbol(btn.dataset.activeToken);
+                        break;
+                    case 'toggle-2nd':
+                        isSecond = !isSecond;
+                        refreshToggleLabels();
+                        break;
+                    case 'toggle-angle':
+                        angleMode = (angleMode === "deg") ? "rad" : "deg";
+                        btnAngle.textContent = angleMode.toUpperCase();
+                        indAngle.textContent = angleMode.toUpperCase();
+                        updateDisplay();
+                        break;
+                    case 'memory-clear': memoryClear(); break;
+                    case 'memory-recall': memoryRecall(); break;
+                    case 'memory-add': memoryAdd(); break;
+                    case 'memory-sub': memorySub(); break;
+                }
+            }
+
+            // ---------- Keyboard support ----------
+            var KEY_MAP = {
+                '+': function () { appendOperator('+'); },
+                '-': function () { appendOperator('−'); },
+                '*': function () { appendOperator('×'); },
+                '/': function () { appendOperator('÷'); },
+                '^': function () { appendOperator('^'); },
+                '%': function () { appendPercent(); },
+                '.': function () { appendDecimal(); },
+                '(': function () { appendOpenParen(); },
+                ')': function () { appendCloseParen(); },
+                'Enter': function () { equals(); },
+                '=': function () { equals(); },
+                'Escape': function () { clearAll(); },
+                'Backspace': function () { backspace(); }
+            };
+
+            window.addEventListener('keydown', function (e) {
+                if (e.key >= '0' && e.key <= '9') {
+                    appendDigit(e.key);
+                    e.preventDefault();
+                    return;
+                }
+                if (KEY_MAP[e.key]) {
+                    KEY_MAP[e.key]();
+                    e.preventDefault();
+                }
+            });
+
+            // ---------- Init ----------
+            refreshToggleLabels();
+            updateDisplay();
+        })();
+    </script>
+
+</body>
+
+</html>
